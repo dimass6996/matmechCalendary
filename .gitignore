@@ -32,5 +32,8 @@ Thumbs.db
 # Rust info
 .rustc_info.json
 
+# Locally installed Go
+.tools/
+
 # Logs
 *.log
