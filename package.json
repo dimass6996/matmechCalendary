@@ -7,7 +7,7 @@
     "frontend:build": "npm run build --prefix frontend",
     "backend:dev": "./backend/syncstudy-server",
     "backend:build": "cd backend && go build -buildvcs=false -o syncstudy-server ./cmd/server",
-    "dev": "concurrently --kill-others \"npm run backend:dev\" \"npm run frontend:dev\"",
+    "dev": "npm run backend:build && concurrently --kill-others \"npm run backend:dev\" \"npm run frontend:dev\"",
     "build": "npm run frontend:build && npm run backend:build"
   },
   "devDependencies": {
