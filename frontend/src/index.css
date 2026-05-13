@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+
+[contenteditable]:empty:before {
+  content: attr(data-placeholder);
+  color: #71717a;
+  cursor: text;
+}
+
+.app-drag-region {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+.no-drag {
+  -webkit-app-region: no-drag;
+}

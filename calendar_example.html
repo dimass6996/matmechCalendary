@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SyncStudy - Fullscreen Schedule</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* БАЗОВЫЕ НАСТРОЙКИ (Full Screen) */
+        body { 
+            font-family: 'Inter', system-ui, sans-serif; 
+            background-color: #ffffff; 
+            margin: 0; 
+            padding: 0; 
+            height: 100vh; 
+            width: 100vw;
+            display: flex; 
+            flex-direction: column; 
+            color: #334155;
+            overflow: hidden; /* Скролл только внутри календаря */
+        }
+        
+        :root {
+            --hour-height: 60px; /* 1 минута = 1px */
+            --start-hour: 8;     /* 08:00 */
+            --end-hour: 22;      /* 22:00 */
+            --time-axis-width: 60px;
+        }
+
+        /* ТОП-БАР (Шапка приложения) */
+        .app-header {
+            height: 64px;
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #e2e8f0;
+            background: #ffffff;
+            flex-shrink: 0;
+            z-index: 40;
+        }
+
+        /* ШАПКА ДНЕЙ НЕДЕЛИ */
+        .calendar-header {
+            display: flex;
+            border-bottom: 1px solid #e2e8f0;
+            background: #ffffff;
+            z-index: 30;
+            flex-shrink: 0;
+            padding-right: 8px; /* Место под скроллбар */
+        }
+        
+        .time-zone-spacer {
+            width: var(--time-axis-width);
+            flex-shrink: 0;
+            border-right: 1px solid #f1f5f9;
+        }
+
+        .day-header {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 12px 0;
+            border-right: 1px solid #f1f5f9;
+            min-width: 120px;
+        }
+        .day-header:last-child { border-right: none; }
+        
+        /* Компактные и аккуратные даты */
+        .day-name { font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 600; margin-bottom: 4px; letter-spacing: 0.5px; }
+        .day-date { font-size: 22px; color: #1e293b; font-weight: 500; line-height: 1; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+        
+        /* Стилизация "Сегодня" в шапке */
+        .day-header.today .day-name { color: #2563eb; }
+        .day-header.today .day-date { background: #2563eb; color: white; font-weight: 600; }
+
+        /* ТЕЛО КАЛЕНДАРЯ */
+        .calendar-body {
+            display: flex;
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            position: relative;
+            background-color: #ffffff;
+        }
+
+        /* ОСЬ ВРЕМЕНИ */
+        .time-axis {
+            width: var(--time-axis-width);
+            flex-shrink: 0;
+            border-right: 1px solid #f1f5f9;
+            background: #ffffff;
+            position: sticky;
+            left: 0;
+            z-index: 20;
+        }
+        
+        .time-label {
+            position: absolute;
+            right: 12px;
+            transform: translateY(-50%); 
+            font-size: 11px;
+            color: #94a3b8;
+            font-weight: 500;
+        }
+
+        /* СЕТКА ДНЕЙ */
+        .days-container {
+            display: flex;
+            flex: 1;
+            position: relative;
+        }
+
+        .day-column {
+            flex: 1;
+            position: relative;
+            border-right: 1px solid #f1f5f9;
+            min-width: 120px;
+        }
+        .day-column:last-child { border-right: none; }
+        .day-column.today { background-color: #f8fafc; /* Легкая подсветка текущего дня */ }
+
+        .grid-line {
+            position: absolute;
+            width: 100%;
+            height: 1px;
+            background-color: #f1f5f9; /* Очень светлая линия, не режет глаз */
+            left: 0;
+            z-index: 1;
+        }
+
+        /* БЛОКИ СОБЫТИЙ (Фокус на читаемость) */
+        .event-block {
+            position: absolute;
+            border-radius: 6px;
+            padding: 6px 10px; /* Больше воздуха внутри */
+            overflow: hidden;
+            box-sizing: border-box;
+            z-index: 10;
+            border: 1px solid rgba(0,0,0,0.02);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .event-block:hover {
+            z-index: 20 !important;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 12px -2px rgba(0,0,0,0.1);
+        }
+
+        .event-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; line-height: 1.2; letter-spacing: -0.01em; }
+        .event-time { font-size: 11px; opacity: 0.8; margin-bottom: 2px; font-variant-numeric: tabular-nums; }
+        .event-meta { font-size: 11px; opacity: 0.8; display: flex; flex-direction: column; gap: 2px; }
+
+        /* ЧИСТЫЕ ЦВЕТОВЫЕ ТЕМЫ */
+        .bg-blue { background-color: #e0f2fe; color: #0369a1; border-left: 4px solid #0ea5e9; }
+        .bg-red { background-color: #ffe4e6; color: #be123c; border-left: 4px solid #f43f5e; }
+        .bg-green { background-color: #dcfce7; color: #15803d; border-left: 4px solid #22c55e; }
+        .bg-purple { background-color: #f3e8ff; color: #6b21a8; border-left: 4px solid #a855f7; }
+        .bg-orange { background-color: #ffedd5; color: #c2410c; border-left: 4px solid #f97316; }
+
+        /* ЛИНИЯ ТЕКУЩЕГО ВРЕМЕНИ */
+        .current-time-line {
+            position: absolute;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background-color: #ea4335;
+            z-index: 25;
+            pointer-events: none;
+        }
+        .current-time-line::before {
+            content: '';
+            position: absolute;
+            left: -5px;
+            top: -4px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #ea4335;
+            box-shadow: 0 0 0 4px rgba(234, 67, 53, 0.2);
+        }
+
+        /* КАСТОМНЫЙ СКРОЛЛБАР */
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 5px; border: 2px solid #ffffff; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body>
+
+    <!-- ТОП-БАР -->
+    <header class="app-header">
+        <div class="flex items-center gap-4">
+            <h1 class="text-xl font-bold text-slate-800 tracking-tight">SyncStudy</h1>
+            <div class="flex items-center gap-2 bg-slate-100 rounded-md p-1">
+                <button class="px-3 py-1 bg-white shadow-sm rounded text-sm font-medium">Неделя</button>
+                <button class="px-3 py-1 text-slate-500 hover:text-slate-700 text-sm font-medium">Месяц</button>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <button class="text-sm font-semibold text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-md hover:bg-slate-100 transition-colors">Сегодня</button>
+            <div class="flex items-center gap-1">
+                <button class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-600">&lt;</button>
+                <span class="text-sm font-medium text-slate-700 min-w-[120px] text-center">11 – 17 Мая 2026</span>
+                <button class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-600">&gt;</button>
+            </div>
+            <div class="w-8 h-8 bg-blue-600 rounded-full text-white flex items-center justify-center text-sm font-bold shadow-sm ml-4 cursor-pointer">S</div>
+        </div>
+    </header>
+
+    <!-- ШАПКА КАЛЕНДАРЯ (Дни) -->
+    <div class="calendar-header" id="calendar-header">
+        <div class="time-zone-spacer"></div>
+        <!-- Рендерится через JS -->
+    </div>
+
+    <!-- ТЕЛО КАЛЕНДАРЯ (Сетка) -->
+    <div class="calendar-body" id="calendar-body">
+        <div class="time-axis" id="time-axis">
+            <!-- Рендерится через JS -->
+        </div>
+        <div class="days-container" id="days-container">
+            <!-- Рендерится через JS -->
+        </div>
+    </div>
+
+    <script>
+        // --- 1. КОНСТАНТЫ ---
+        const START_HOUR = 8;
+        const END_HOUR = 22; // Расширили до 22:00
+        const PX_PER_MINUTE = 1;
+
+        // Неделя
+        const WEEK_DATES = [
+            { date: "2026-05-11", name: "Пн", dayNum: "11" },
+            { date: "2026-05-12", name: "Вт", dayNum: "12" },
+            { date: "2026-05-13", name: "Ср", dayNum: "13" }, 
+            { date: "2026-05-14", name: "Чт", dayNum: "14", isToday: true }, // Сделали Четверг "Сегодня"
+            { date: "2026-05-15", name: "Пт", dayNum: "15" },
+            { date: "2026-05-16", name: "Сб", dayNum: "16" }
+        ];
+
+        // --- 2. ДАННЫЕ (Плоский массив) ---
+        const MOCK_EVENTS = [
+            // Понедельник
+            { id: "e1", title: "Математический анализ", type: "Лекция", start: "2026-05-11T09:00:00", end: "2026-05-11T10:30:00", room: "Ауд. 402", color: "bg-blue" },
+            { id: "e2", title: "Алгоритмы и СД", type: "Лабораторная", start: "2026-05-11T10:45:00", end: "2026-05-11T12:15:00", room: "Комп. Класс 115", color: "bg-red" },
+            
+            // Вторник
+            { id: "e3", title: "Базы данных", type: "Лекция", start: "2026-05-12T10:00:00", end: "2026-05-12T11:30:00", room: "Ауд. 301", color: "bg-green" },
+            { id: "e4", title: "Базы данных", type: "Практика", start: "2026-05-12T12:00:00", end: "2026-05-12T13:30:00", room: "Ауд. 301", color: "bg-green" },
+            
+            // Среда
+            { id: "e5", title: "Физика", type: "Лекция", start: "2026-05-13T09:00:00", end: "2026-05-13T10:30:00", room: "Ауд. 202", color: "bg-purple" },
+            { id: "e8", title: "Английский язык", type: "Практика", start: "2026-05-13T14:00:00", end: "2026-05-13T15:30:00", room: "Ауд. 510", color: "bg-orange" },
+
+            // Четверг (СЕГОДНЯ + КОНФЛИКТЫ)
+            { id: "e6", title: "Архитектура ЭВМ", type: "Лекция", start: "2026-05-14T09:00:00", end: "2026-05-14T10:30:00", room: "Ауд. 402", color: "bg-blue" },
+            { id: "e7", title: "Пересдача: Матан", type: "Экзамен", start: "2026-05-14T10:00:00", end: "2026-05-14T11:30:00", room: "Кафедра", color: "bg-red" },
+            { id: "e9", title: "Консультация (Курсовая)", type: "Встреча", start: "2026-05-14T10:45:00", end: "2026-05-14T12:15:00", room: "Ауд. 115", color: "bg-purple" },
+            { id: "e10", title: "Физкультура", type: "Практика", start: "2026-05-14T13:00:00", end: "2026-05-14T14:30:00", room: "Стадион", color: "bg-green" },
+
+            // Пятница
+            { id: "e11", title: "Проектный практикум", type: "Лабораторная", start: "2026-05-15T10:45:00", end: "2026-05-15T14:00:00", room: "Коворкинг", color: "bg-orange" }
+        ];
+
+        // --- 3. ИНИЦИАЛИЗАЦИЯ ИНТЕРФЕЙСА ---
+        function initCalendar() {
+            renderHeaders();
+            renderGrid();
+            renderAllEvents();
+            renderCurrentTimeIndicator();
+        }
+
+        // Рендер шапки
+        function renderHeaders() {
+            const headerContainer = document.getElementById('calendar-header');
+            WEEK_DATES.forEach(day => {
+                const dayEl = document.createElement('div');
+                dayEl.className = `day-header ${day.isToday ? 'today' : ''}`;
+                dayEl.innerHTML = `
+                    <div class="day-name">${day.name}</div>
+                    <div class="day-date">${day.dayNum}</div>
+                `;
+                headerContainer.appendChild(dayEl);
+            });
+        }
+
+        // Рендер колонок и горизонтальных линий
+        function renderGrid() {
+            const timeAxis = document.getElementById('time-axis');
+            const daysContainer = document.getElementById('days-container');
+            
+            const totalHours = END_HOUR - START_HOUR + 1;
+            const containerHeight = totalHours * 60;
+
+            WEEK_DATES.forEach(day => {
+                const col = document.createElement('div');
+                col.className = `day-column ${day.isToday ? 'today' : ''}`;
+                col.dataset.date = day.date;
+                col.style.height = `${containerHeight}px`;
+
+                for (let hour = START_HOUR; hour <= END_HOUR; hour++) {
+                    const yPos = (hour - START_HOUR) * 60;
+                    const gridLine = document.createElement('div');
+                    gridLine.className = 'grid-line';
+                    gridLine.style.top = `${yPos}px`;
+                    col.appendChild(gridLine);
+                }
+                daysContainer.appendChild(col);
+            });
+
+            timeAxis.style.height = `${containerHeight}px`;
+            for (let hour = START_HOUR; hour <= END_HOUR; hour++) {
+                const yPos = (hour - START_HOUR) * 60;
+                const timeLabel = document.createElement('div');
+                timeLabel.className = 'time-label';
+                timeLabel.style.top = `${yPos}px`;
+                timeLabel.innerText = `${hour.toString().padStart(2, '0')}:00`;
+                timeAxis.appendChild(timeLabel);
+            }
+        }
+
+        // --- 4. ЛОГИКА РАСПРЕДЕЛЕНИЯ СОБЫТИЙ ---
+        function renderAllEvents() {
+            const eventsByDate = {};
+            MOCK_EVENTS.forEach(ev => {
+                const dateKey = ev.start.split('T')[0];
+                if (!eventsByDate[dateKey]) eventsByDate[dateKey] = [];
+                eventsByDate[dateKey].push(ev);
+            });
+
+            WEEK_DATES.forEach(day => {
+                const colEl = document.querySelector(`.day-column[data-date="${day.date}"]`);
+                if (!colEl || !eventsByDate[day.date]) return;
+
+                const dayEvents = eventsByDate[day.date];
+                const laidOutEvents = calculateOverlapLogic(dayEvents);
+
+                laidOutEvents.forEach(ev => {
+                    const block = document.createElement('div');
+                    block.className = `event-block ${ev.color}`;
+                    
+                    block.style.top = `${ev.topPx}px`;
+                    block.style.height = `${ev.heightPx}px`;
+                    
+                    // Оставляем 2% зазор между конфликтующими блоками и 4px справа от края
+                    block.style.width = `calc(${ev.widthPercent}% - 4px)`;
+                    block.style.left = `calc(${ev.leftPercent}% + 2px)`;
+
+                    const formatTime = (iso) => iso.split('T')[1].substring(0, 5);
+                    
+                    // Рендер контента внутри блока (читаемость)
+                    block.innerHTML = `
+                        <div class="event-title">${ev.title}</div>
+                        <div class="event-time">${formatTime(ev.start)} - ${formatTime(ev.end)}</div>
+                        <div class="event-meta">
+                            ${ev.type ? `<span>${ev.type}</span>` : ''}
+                            ${ev.room ? `<span>${ev.room}</span>` : ''}
+                        </div>
+                    `;
+                    
+                    colEl.appendChild(block);
+                });
+            });
+        }
+
+        // Вспомогательные функции алгоритма наложения
+        function getMinutes(isoString) {
+            const date = new Date(isoString);
+            return ((date.getHours() - START_HOUR) * 60) + date.getMinutes();
+        }
+
+        function calculateOverlapLogic(events) {
+            const processed = events.map(ev => {
+                const startMins = getMinutes(ev.start);
+                const endMins = getMinutes(ev.end);
+                return { 
+                    ...ev, 
+                    startMins, 
+                    endMins,
+                    topPx: startMins * PX_PER_MINUTE,
+                    heightPx: (endMins - startMins) * PX_PER_MINUTE,
+                    widthPercent: 100,
+                    leftPercent: 0
+                };
+            });
+
+            processed.sort((a, b) => a.startMins - b.startMins);
+
+            let columns = [];
+            let lastEventEnding = null;
+
+            processed.forEach(event => {
+                if (lastEventEnding !== null && event.startMins >= lastEventEnding) {
+                    assignWidthsAndPositions(columns);
+                    columns = [];
+                    lastEventEnding = null;
+                }
+
+                let placed = false;
+                for (let i = 0; i < columns.length; i++) {
+                    const col = columns[i];
+                    const lastEventInCol = col[col.length - 1];
+                    if (event.startMins >= lastEventInCol.endMins) {
+                        col.push(event);
+                        placed = true;
+                        break;
+                    }
+                }
+
+                if (!placed) columns.push([event]);
+                if (lastEventEnding === null || event.endMins > lastEventEnding) lastEventEnding = event.endMins;
+            });
+
+            if (columns.length > 0) assignWidthsAndPositions(columns);
+            return processed;
+        }
+
+        function assignWidthsAndPositions(columns) {
+            const numColumns = columns.length;
+            columns.forEach((col, colIndex) => {
+                col.forEach(event => {
+                    event.widthPercent = 100 / numColumns;
+                    event.leftPercent = (100 / numColumns) * colIndex;
+                });
+            });
+        }
+
+        // --- 5. ТЕКУЩЕЕ ВРЕМЯ (Current Time Indicator) ---
+        function renderCurrentTimeIndicator() {
+            const todayCol = document.querySelector('.day-column.today');
+            if (!todayCol) return;
+
+            // Эмулируем время 11:15 (Четверг, показывает пересечение)
+            const simulatedTime = "2026-05-14T11:15:00";
+            const topPx = getMinutes(simulatedTime) * PX_PER_MINUTE;
+
+            const line = document.createElement('div');
+            line.className = 'current-time-line';
+            line.style.top = `${topPx}px`;
+            
+            todayCol.appendChild(line);
+
+            // Авто-скролл к 08:00 (Начало дня)
+            setTimeout(() => {
+                const scrollContainer = document.getElementById('calendar-body');
+                scrollContainer.scrollTop = 30; // Небольшой отступ сверху
+            }, 100);
+        }
+
+        // Запуск
+        document.addEventListener('DOMContentLoaded', initCalendar);
+    </script>
+</body>
+</html>

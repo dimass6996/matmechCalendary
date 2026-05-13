@@ -1,0 +1,17 @@
+{
+  "name": "syncstudy-root",
+  "private": true,
+  "scripts": {
+    "predev": "fuser -k 5173/tcp 5174/tcp 8080/tcp 2>/dev/null; true",
+    "frontend:dev": "npm run dev --prefix frontend",
+    "frontend:build": "npm run build --prefix frontend",
+    "backend:dev": "./backend/syncstudy-server",
+    "backend:build": "cd backend && go build -buildvcs=false -o syncstudy-server ./cmd/server",
+    "dev": "concurrently --kill-others \"npm run backend:dev\" \"npm run frontend:dev\"",
+    "build": "npm run frontend:build && npm run backend:build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.1",
+    "concurrently": "^9.1.0"
+  }
+}

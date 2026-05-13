@@ -1,0 +1,36 @@
+node_modules/
+dist/
+
+# Rust / Tauri
+src-tauri/target/
+src-tauri/binaries/
+src-tauri/gen/schemas/
+.cargo/
+
+# Go backend build
+backend/syncstudy-server
+
+# SQLite databases
+*.db
+*.db-shm
+*.db-wal
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Env
+.env
+.env.local
+
+# Rust info
+.rustc_info.json
+
+# Logs
+*.log
